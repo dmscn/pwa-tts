@@ -47,7 +47,7 @@ const TextToSpeech = () => {
         if (audioUrl) {
             const link = document.createElement('a');
             link.href = audioUrl;
-            link.download = `tts-output-${Date.now()}.wav`;
+            link.download = `tts-output-${Date.now()}.mp3`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
