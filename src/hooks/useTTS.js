@@ -19,9 +19,13 @@ export const useTTS = () => {
     }, [audioUrl]);
 
     const handleGenerate = useCallback(async () => {
-        setLoading(true);
+        // Clear previous audio and error state
+        if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+        }
+        setAudioUrl(null);
         setError(null);
-        setAudioUrl(null); // Clear previous audio
+        setLoading(true);
 
         try {
             if (!text.trim()) {
@@ -53,17 +57,13 @@ export const useTTS = () => {
                     throw new Error('Invalid audio data received');
                 }
 
-                // Revoke previous URL to prevent memory leaks
-                if (audioUrl) {
-                    URL.revokeObjectURL(audioUrl);
-                }
-
                 const url = URL.createObjectURL(audioBlob);
                 setAudioUrl(url);
             }
         } catch (err) {
             console.error('Generation failed:', err);
             setError(err.message || 'Failed to generate audio. Please try again.');
+            setAudioUrl(null); // Ensure audio is cleared on error
         } finally {
             setLoading(false);
         }

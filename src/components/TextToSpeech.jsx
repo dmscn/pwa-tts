@@ -19,6 +19,9 @@ const TextToSpeech = () => {
         setSelectedVoice
     } = useTTS();
 
+    // Ensure audio section is not visible during generation
+    const showAudioSection = !loading && audioUrl;
+
     return (
         <div className="space-y-4">
             <VoiceSelect onVoiceChange={setSelectedVoice} />
@@ -50,7 +53,7 @@ const TextToSpeech = () => {
                     error={error}
                 />
 
-                {audioUrl && (
+                {showAudioSection && (
                     <AudioOutput
                         audioUrl={audioUrl}
                         onDownload={handleDownload}
