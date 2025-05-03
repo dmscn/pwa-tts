@@ -3,10 +3,12 @@
   "type": "module",
   "version": "0.0.1",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "npm run kokoro-api:start && astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "kokoro-api:start": "./start-kokoro.sh",
+    "kokoro-api:stop": "docker compose down"
   },
   "dependencies": {
     "@astrojs/react": "^3.6.3",
