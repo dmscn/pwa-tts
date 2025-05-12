@@ -1,0 +1,15 @@
+version: '3'
+name: kokoro
+services:
+  kokoro-fastapi-gpu:
+    ports:
+      - 8880:8880
+    image: ghcr.io/remsky/kokoro-fastapi-gpu:v0.2.1
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

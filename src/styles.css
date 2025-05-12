@@ -1,3 +1,32 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  * {
+    @apply transition-colors duration-200;
+  }
+
+  body {
+    @apply antialiased;
+  }
+
+  audio::-webkit-media-controls-panel {
+    @apply bg-gray-100 dark:bg-gray-800 transition-colors duration-200;
+  }
+
+  audio::-webkit-media-controls-current-time-display,
+  audio::-webkit-media-controls-time-remaining-display {
+    @apply text-gray-900 dark:text-white;
+  }
+
+  select optgroup,
+  select option {
+    @apply bg-gray-50 dark:bg-gray-700;
+  }
+
+  .backdrop-blur-toggle {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}

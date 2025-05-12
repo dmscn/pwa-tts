@@ -1,108 +1,151 @@
-import { KokoroTTS } from 'kokoro-js';
+const KOKORO_API_URL = 'http://localhost:8880/v1';
 
-let ttsInstance = null;
+/**
+ * Fetches available voices from the Kokoro-FastAPI service
+ * @returns {Promise<{single: string[], combinations: string[]}>}
+ */
+export const getAvailableVoices = async () => {
+    try {
+        const response = await fetch(`${KOKORO_API_URL}/audio/voices`, {
+            headers: {
+                'Authorization': 'Bearer not-needed'
+            }
+        });
 
-const initTTS = async () => {
-    if (!ttsInstance) {
-        console.log('Initializing TTS instance...');
-        try {
-            ttsInstance = await KokoroTTS.from_pretrained(
-                "onnx-community/Kokoro-82M-v1.0-ONNX",
-                {
-                    dtype: "fp32",  // Using full precision for best quality
-                    device: "wasm"   // Using WebAssembly for browser compatibility
-                }
-            );
-            console.log('TTS instance initialized successfully');
-        } catch (err) {
-            console.error('Failed to initialize TTS:', err);
-            throw err;
+        if (!response.ok) {
+            throw new Error('Failed to fetch available voices');
         }
+
+        const data = await response.json();
+        console.log('Available voices:', data);
+
+        // Organize voices by language/gender prefixes
+        const voices = {
+            single: data.voices || [],
+            combinations: [] // The service currently doesn't support combinations through the API
+        };
+
+        return voices;
+    } catch (error) {
+        console.error('Failed to fetch voices:', error);
+        // Fallback to basic voices if fetch fails
+        return {
+            single: ['af_bella'],
+            combinations: []
+        };
     }
-    return ttsInstance;
 };
 
 /**
- * Generates speech from text using Kokoro TTS
- * @param {string} text - The text to convert to speech
- * @returns {Promise<Blob>} - A promise that resolves to an audio blob
+ * OpenAI client instance for Kokoro-FastAPI
  */
-export const generateSpeech = async (text) => {
-    try {
-        console.log('Starting speech generation for text:', text);
+class KokoroClient {
+    constructor() {
+        this.baseUrl = KOKORO_API_URL;
+    }
 
-        const tts = await initTTS();
-        console.log('Got TTS instance, generating audio...');
+    async createSpeech(input, voice = 'af_bella', model = 'kokoro', format = 'mp3') {
+        try {
+            console.log('Starting speech generation:', { input, voice, model, format });
 
-        // Generate audio with optimal settings
-        const { audio } = await tts.generate(text, {
-            voice: "af_bella",         // Using Bella's voice for clearer speech
-            speaker_emb_noise: 0.1,    // Low noise for clearer pronunciation
-            length_penalty: 0.8,       // Natural pacing between words
-            temperature: 0.7,          // Consistent pronunciation
-            top_k: 20                  // Better phoneme selection
-        });
-        console.log('Audio generated successfully');
+            const response = await fetch(`${this.baseUrl}/audio/speech`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer not-needed'
+                },
+                body: JSON.stringify({
+                    model,
+                    input,
+                    voice,
+                    response_format: format
+                })
+            });
 
-        if (!audio) {
-            throw new Error('No audio data received from TTS engine');
-        }
-
-        // Convert Float32Array to WAV format
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const buffer = audioContext.createBuffer(1, audio.length, 24000);
-        buffer.getChannelData(0).set(audio);
-
-        // Convert AudioBuffer to WAV Blob
-        const wavBlob = await new Promise(resolve => {
-            const channels = 1;
-            const sampleRate = 24000;
-            const bitsPerSample = 16;
-
-            // Create WAV header
-            const headerLength = 44;
-            const dataLength = audio.length * 2;
-            const totalLength = headerLength + dataLength;
-
-            const arrayBuffer = new ArrayBuffer(totalLength);
-            const dataView = new DataView(arrayBuffer);
-
-            const writeString = (view, offset, string) => {
-                for (let i = 0; i < string.length; i++) {
-                    view.setUint8(offset + i, string.charCodeAt(i));
-                }
-            };
-
-            writeString(dataView, 0, 'RIFF');
-            dataView.setUint32(4, totalLength - 8, true);
-            writeString(dataView, 8, 'WAVE');
-            writeString(dataView, 12, 'fmt ');
-            dataView.setUint32(16, 16, true);
-            dataView.setUint16(20, 1, true);
-            dataView.setUint16(22, channels, true);
-            dataView.setUint32(24, sampleRate, true);
-            dataView.setUint32(28, sampleRate * channels * (bitsPerSample / 8), true);
-            dataView.setUint16(32, channels * (bitsPerSample / 8), true);
-            dataView.setUint16(34, bitsPerSample, true);
-            writeString(dataView, 36, 'data');
-            dataView.setUint32(40, dataLength, true);
-
-            // Convert and write audio data
-            const samples = new Int16Array(audio.length);
-            for (let i = 0; i < audio.length; i++) {
-                const s = Math.max(-1, Math.min(1, audio[i]));
-                samples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to generate audio');
             }
 
-            new Int16Array(arrayBuffer, 44).set(samples);
+            const audioBlob = await response.blob();
+            console.log('Audio generated successfully');
 
-            resolve(new Blob([arrayBuffer], { type: 'audio/wav' }));
+            return audioBlob;
+        } catch (error) {
+            console.error('TTS Generation error:', error);
+            throw new Error(`Failed to generate speech: ${error.message}`);
+        }
+    }
+
+    async createStreamingSpeech(input, voice = 'af_bella', model = 'kokoro', format = 'mp3') {
+        try {
+            console.log('Starting streaming speech generation:', { input, voice, model, format });
+
+            const response = await fetch(`${this.baseUrl}/audio/speech`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer not-needed'
+                },
+                body: JSON.stringify({
+                    model,
+                    input,
+                    voice,
+                    response_format: format,
+                    stream: true
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to generate audio stream');
+            }
+
+            return response.body;
+        } catch (error) {
+            console.error('TTS Streaming error:', error);
+            throw new Error(`Failed to generate speech stream: ${error.message}`);
+        }
+    }
+}
+
+// Create a singleton instance
+const kokoroClient = new KokoroClient();
+
+/**
+ * Generates speech from text using Kokoro-FastAPI
+ * @param {string} text - The text to convert to speech
+ * @param {string} voice - The voice or voice combination to use
+ * @param {boolean} stream - Whether to use streaming for long texts
+ * @returns {Promise<Blob|ReadableStream>} - Audio blob or stream
+ */
+export const generateSpeech = async (text, voice = 'af_bella', stream = false) => {
+    try {
+        console.log('Starting speech generation:', { text, voice, stream });
+
+        const response = await fetch(`${KOKORO_API_URL}/audio/speech`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer not-needed'
+            },
+            body: JSON.stringify({
+                model: 'kokoro',
+                input: text,
+                voice,
+                response_format: 'mp3',
+                stream
+            })
         });
 
-        return wavBlob;
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to generate audio');
+        }
+
+        return stream ? response.body : response.blob();
     } catch (error) {
         console.error('TTS Generation error:', error);
-        console.error('Error stack:', error.stack);
         throw new Error(`Failed to generate speech: ${error.message}`);
     }
 };
